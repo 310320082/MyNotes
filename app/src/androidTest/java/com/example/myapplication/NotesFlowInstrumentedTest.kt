@@ -5,6 +5,7 @@ import android.content.Intent
 import android.app.Notification
 import android.app.NotificationManager
 import android.os.Build
+import android.os.SystemClock
 import android.view.View
 import android.widget.DatePicker
 import android.widget.TimePicker
@@ -186,12 +187,20 @@ class NotesFlowInstrumentedTest {
                 .putExtra("note_id", notificationId)
         )
 
-        val notification = notificationManager.activeNotifications
-            .firstOrNull { it.id == notificationId }?.notification
-        assertNotNull(notification)
-        assertEquals("Напоминание", notification!!.extras.getCharSequence(Notification.EXTRA_TITLE))
-        assertEquals(reminderText, notification.extras.getCharSequence(Notification.EXTRA_TEXT))
-        notificationManager.cancel(notificationId)
+        var notification: Notification? = null
+        val deadline = SystemClock.uptimeMillis() + 3_000L
+        while (notification == null && SystemClock.uptimeMillis() < deadline) {
+            notification = notificationManager.activeNotifications
+                .firstOrNull { it.id == notificationId }?.notification
+            if (notification == null) SystemClock.sleep(100L)
+        }
+        try {
+            assertNotNull(notification)
+            assertEquals("Напоминание", notification!!.extras.getCharSequence(Notification.EXTRA_TITLE))
+            assertEquals(reminderText, notification.extras.getCharSequence(Notification.EXTRA_TEXT))
+        } finally {
+            notificationManager.cancel(notificationId)
+        }
     }
 
     private fun notesPreferences() = context.getSharedPreferences("notes_storage", Context.MODE_PRIVATE)
