@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var noteEntryForm: View
     private lateinit var expenseEntryForm: View
     private lateinit var editTextNote: EditText
+    private lateinit var editTextExpenseDescription: EditText
     private lateinit var editTextExpenseAmount: EditText
     private lateinit var currentCategory: String
     private var selectedReminder: Long? = null
@@ -58,6 +59,7 @@ class MainActivity : AppCompatActivity() {
         noteEntryForm = findViewById(R.id.noteEntryForm)
         expenseEntryForm = findViewById(R.id.expenseEntryForm)
         editTextNote = findViewById(R.id.editTextNote)
+        editTextExpenseDescription = findViewById(R.id.editTextExpenseDescription)
         editTextExpenseAmount = findViewById(R.id.editTextExpenseAmount)
         ensureNotificationChannel()
         loadNotes()
@@ -86,6 +88,7 @@ class MainActivity : AppCompatActivity() {
         if (isExpenses) {
             selectedExpenseDate = startOfDay(System.currentTimeMillis())
             findViewById<Button>(R.id.buttonExpenseDate).text = "Дата: ${formatDate(selectedExpenseDate)}"
+            editTextExpenseDescription.text.clear()
             editTextExpenseAmount.text.clear()
         }
         findViewById<TextView>(R.id.textViewCategoryTitle).text = category
@@ -218,6 +221,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun addExpense() {
+        val description = editTextExpenseDescription.text.toString().trim()
+        if (description.isEmpty()) {
+            editTextExpenseDescription.error = "Введите, на что потрачено"
+            return
+        }
         val rawAmount = editTextExpenseAmount.text.toString().trim().replace(" ", "").replace(',', '.')
         val amountKopecks = try {
             BigDecimal(rawAmount).setScale(2, RoundingMode.HALF_UP).movePointRight(2).longValueExact()
@@ -229,14 +237,10 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val existingIndex = expenses.indexOfFirst { startOfDay(it.date) == selectedExpenseDate }
-        if (existingIndex >= 0) {
-            val existing = expenses[existingIndex]
-            expenses[existingIndex] = existing.copy(amountKopecks = existing.amountKopecks + amountKopecks)
-        } else {
-            expenses.add(Expense(selectedExpenseDate, amountKopecks))
-        }
+        expenses.add(Expense(selectedExpenseDate, amountKopecks, description))
         saveExpenses()
+        editTextExpenseDescription.text.clear()
+        editTextExpenseDescription.error = null
         editTextExpenseAmount.text.clear()
         editTextExpenseAmount.error = null
         showExpenses()
@@ -245,6 +249,16 @@ class MainActivity : AppCompatActivity() {
     private fun showExpenses() {
         notesContainer.removeAllViews()
         val today = Calendar.getInstance()
+        val weekStart = Calendar.getInstance().apply {
+            timeInMillis = startOfDay(today.timeInMillis)
+            val daysSinceMonday = (get(Calendar.DAY_OF_WEEK) + 5) % 7
+            add(Calendar.DAY_OF_YEAR, -daysSinceMonday)
+        }.timeInMillis
+        val nextWeekStart = Calendar.getInstance().apply {
+            timeInMillis = weekStart
+            add(Calendar.DAY_OF_YEAR, 7)
+        }.timeInMillis
+        val weekTotal = expenses.filter { it.date >= weekStart && it.date < nextWeekStart }.sumOf { it.amountKopecks }
         val monthTotal = expenses.filter { expense ->
             val date = Calendar.getInstance().apply { timeInMillis = expense.date }
             date.get(Calendar.YEAR) == today.get(Calendar.YEAR) && date.get(Calendar.MONTH) == today.get(Calendar.MONTH)
@@ -253,7 +267,7 @@ class MainActivity : AppCompatActivity() {
             Calendar.getInstance().apply { timeInMillis = expense.date }.get(Calendar.YEAR) == today.get(Calendar.YEAR)
         }.sumOf { it.amountKopecks }
         notesContainer.addView(TextView(this).apply {
-            text = "Итого за месяц: ${formatMoney(monthTotal)}\nИтого за ${today.get(Calendar.YEAR)} год: ${formatMoney(yearTotal)}"
+            text = "Итого за неделю: ${formatMoney(weekTotal)}\nИтого за месяц: ${formatMoney(monthTotal)}\nИтого за ${today.get(Calendar.YEAR)} год: ${formatMoney(yearTotal)}"
             textSize = 18f
             setPadding(12, 12, 12, 20)
         })
@@ -269,6 +283,13 @@ class MainActivity : AppCompatActivity() {
                 textSize = 18f
                 setPadding(12, 8, 4, 8)
             })
+            dayExpenses.asReversed().forEach { expense ->
+                notesContainer.addView(TextView(this).apply {
+                    text = "   ${expense.description} — ${formatMoney(expense.amountKopecks)}"
+                    textSize = 16f
+                    setPadding(20, 4, 4, 8)
+                })
+            }
         }
     }
 
@@ -338,7 +359,7 @@ class MainActivity : AppCompatActivity() {
             val array = JSONArray(saved)
             for (index in 0 until array.length()) {
                 val item = array.getJSONObject(index)
-                expenses.add(Expense(item.getLong("date"), item.getLong("amountKopecks")))
+                expenses.add(Expense(item.getLong("date"), item.getLong("amountKopecks"), item.optString("description", "Без описания").ifBlank { "Без описания" }))
             }
         } catch (_: Exception) { expenses.clear() }
     }
@@ -351,10 +372,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveExpenses() {
         val array = JSONArray()
-        expenses.forEach { expense -> array.put(JSONObject().put("date", expense.date).put("amountKopecks", expense.amountKopecks)) }
+        expenses.forEach { expense -> array.put(JSONObject().put("date", expense.date).put("amountKopecks", expense.amountKopecks).put("description", expense.description)) }
         preferences.edit().putString("expenses", array.toString()).apply()
     }
 
     private data class Note(val text: String, val category: String, val reminderAt: Long? = null, val id: Int = (System.currentTimeMillis() % Int.MAX_VALUE).toInt(), val dateOnly: Boolean = false)
-    private data class Expense(val date: Long, val amountKopecks: Long)
+    private data class Expense(val date: Long, val amountKopecks: Long, val description: String)
 }

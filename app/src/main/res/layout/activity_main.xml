@@ -55,6 +55,7 @@
             android:visibility="gone">
             <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="8dp" android:text="Новый расход" android:textSize="18sp" android:textStyle="bold" />
             <Button android:id="@+id/buttonExpenseDate" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Выбрать дату" />
+            <EditText android:id="@+id/editTextExpenseDescription" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="На что потрачено" android:inputType="textCapSentences" android:minHeight="52dp" android:layout_marginBottom="8dp" />
             <EditText android:id="@+id/editTextExpenseAmount" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Сумма, ₽" android:inputType="numberDecimal" android:minHeight="52dp" android:layout_marginBottom="8dp" />
             <Button android:id="@+id/buttonAddExpense" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Добавить расход" />
         </LinearLayout>

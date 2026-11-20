@@ -26,6 +26,7 @@ import androidx.test.espresso.matcher.ViewMatchers.withText
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.core.app.ActivityScenario
 import org.hamcrest.Matcher
+import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.not
 import org.hamcrest.Matchers.startsWith
 import org.json.JSONArray
@@ -147,21 +148,29 @@ class NotesFlowInstrumentedTest {
         val today = Calendar.getInstance()
         onView(isAssignableFrom(DatePicker::class.java)).perform(setDate(today.get(Calendar.YEAR), today.get(Calendar.MONTH), today.get(Calendar.DAY_OF_MONTH)))
         onView(withId(android.R.id.button1)).perform(click())
+        onView(withId(R.id.editTextExpenseDescription)).perform(replaceText("Продукты"), closeSoftKeyboard())
         onView(withId(R.id.editTextExpenseAmount)).perform(replaceText("125,50"), closeSoftKeyboard())
         onView(withId(R.id.buttonAddExpense)).perform(click())
-        onView(withText(startsWith("Итого за месяц:"))).check(matches(isDisplayed()))
+        onView(withText(containsString("Итого за месяц:"))).check(matches(isDisplayed()))
+        onView(withText(startsWith("Итого за неделю:"))).check(matches(isDisplayed()))
         onView(withText(startsWith("• "))).check(matches(isDisplayed()))
 
+        onView(withId(R.id.editTextExpenseDescription)).perform(replaceText("Кофе"), closeSoftKeyboard())
         onView(withId(R.id.editTextExpenseAmount)).perform(replaceText("75,50"), closeSoftKeyboard())
         onView(withId(R.id.buttonAddExpense)).perform(click())
         val savedExpenses = JSONArray(notesPreferences().getString("expenses", "[]"))
-        assertEquals(1, savedExpenses.length())
-        assertEquals(20100L, savedExpenses.getJSONObject(0).getLong("amountKopecks"))
+        assertEquals(2, savedExpenses.length())
+        assertEquals(20100L, (0 until savedExpenses.length()).sumOf { savedExpenses.getJSONObject(it).getLong("amountKopecks") })
+        val descriptions = (0 until savedExpenses.length()).map { savedExpenses.getJSONObject(it).getString("description") }
+        assertTrue(descriptions.containsAll(listOf("Продукты", "Кофе")))
 
         scenario.recreate()
         onView(withId(R.id.buttonExpenses)).perform(click())
+        onView(withText(org.hamcrest.Matchers.containsString("Итого за неделю: 201,00"))).check(matches(isDisplayed()))
         onView(withText(org.hamcrest.Matchers.containsString("Итого за месяц: 201,00"))).check(matches(isDisplayed()))
         onView(withText(org.hamcrest.Matchers.containsString("Итого за ${today.get(Calendar.YEAR)} год: 201,00"))).check(matches(isDisplayed()))
+        onView(withText(containsString("Продукты — 125,50"))).check(matches(isDisplayed()))
+        onView(withText(containsString("Кофе — 75,50"))).check(matches(isDisplayed()))
     }
 
     @Test
