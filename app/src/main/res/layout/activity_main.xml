@@ -14,6 +14,7 @@
         <Button android:id="@+id/buttonFavorites" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="⭐ Избранное" />
         <Button android:id="@+id/buttonShopping" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="🛒 Покупки" />
         <Button android:id="@+id/buttonTemporary" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Обычные" />
+        <Button android:id="@+id/buttonExpenses" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Расходы" />
     </LinearLayout>
 
     <LinearLayout
@@ -42,6 +43,20 @@
             <EditText android:id="@+id/editTextNote" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Введите заметку" android:minHeight="52dp" android:layout_marginBottom="8dp" />
             <Button android:id="@+id/buttonReminder" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Выбрать дату и время" />
             <Button android:id="@+id/buttonAdd" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Добавить заметку" />
+        </LinearLayout>
+        <LinearLayout
+            android:id="@+id/expenseEntryForm"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:visibility="gone">
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="8dp" android:text="Новый расход" android:textSize="18sp" android:textStyle="bold" />
+            <Button android:id="@+id/buttonExpenseDate" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Выбрать дату" />
+            <EditText android:id="@+id/editTextExpenseAmount" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Сумма, ₽" android:inputType="numberDecimal" android:minHeight="52dp" android:layout_marginBottom="8dp" />
+            <Button android:id="@+id/buttonAddExpense" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Добавить расход" />
         </LinearLayout>
     </LinearLayout>
 </FrameLayout>
