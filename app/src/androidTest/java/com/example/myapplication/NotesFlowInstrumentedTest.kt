@@ -47,6 +47,7 @@ class NotesFlowInstrumentedTest {
     @Before
     fun prepareCleanTestState() {
         notesPreferences().edit().clear().commit()
+        context.deleteDatabase(NotesDatabaseHelper.DATABASE_NAME)
         if (Build.VERSION.SDK_INT >= 33) {
             val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
             automation.adoptShellPermissionIdentity("android.permission.GRANT_RUNTIME_PERMISSIONS")
@@ -62,6 +63,7 @@ class NotesFlowInstrumentedTest {
     fun closeApp() {
         if (::scenario.isInitialized) scenario.close()
         notesPreferences().edit().clear().commit()
+        context.deleteDatabase(NotesDatabaseHelper.DATABASE_NAME)
     }
 
     @Test
@@ -112,9 +114,9 @@ class NotesFlowInstrumentedTest {
 
         onView(withId(R.id.buttonAdd)).perform(click())
         onView(withText(startsWith("• Заметка с напоминанием\n⏰"))).check(matches(isDisplayed()))
-        val savedNote = JSONArray(notesPreferences().getString("notes", "[]")).getJSONObject(0)
-        assertTrue(savedNote.getLong("reminderAt") > System.currentTimeMillis())
-        assertTrue(savedNote.getString("category") == "Обычные")
+        val savedNote = savedNotes().single()
+        assertTrue(savedNote.reminderAt!! > System.currentTimeMillis())
+        assertEquals("Обычные", savedNote.category)
     }
 
     @Test
@@ -132,9 +134,9 @@ class NotesFlowInstrumentedTest {
 
         onView(withId(R.id.buttonAdd)).perform(click())
         onView(withText(startsWith("• Покупка по дате\n📅"))).check(matches(isDisplayed()))
-        val savedNote = JSONArray(notesPreferences().getString("notes", "[]")).getJSONObject(0)
-        assertTrue(savedNote.getBoolean("dateOnly"))
-        assertTrue(savedNote.getLong("reminderAt") > System.currentTimeMillis())
+        val savedNote = savedNotes().single()
+        assertTrue(savedNote.dateOnly)
+        assertTrue(savedNote.reminderAt!! > System.currentTimeMillis())
     }
 
     @Test
@@ -158,10 +160,10 @@ class NotesFlowInstrumentedTest {
         onView(withId(R.id.editTextExpenseDescription)).perform(replaceText("Кофе"), closeSoftKeyboard())
         onView(withId(R.id.editTextExpenseAmount)).perform(replaceText("75,50"), closeSoftKeyboard())
         onView(withId(R.id.buttonAddExpense)).perform(click())
-        val savedExpenses = JSONArray(notesPreferences().getString("expenses", "[]"))
-        assertEquals(2, savedExpenses.length())
-        assertEquals(20100L, (0 until savedExpenses.length()).sumOf { savedExpenses.getJSONObject(it).getLong("amountKopecks") })
-        val descriptions = (0 until savedExpenses.length()).map { savedExpenses.getJSONObject(it).getString("description") }
+        val savedExpenses = savedExpenses()
+        assertEquals(2, savedExpenses.size)
+        assertEquals(20100L, savedExpenses.sumOf { it.amountKopecks })
+        val descriptions = savedExpenses.map { it.description }
         assertTrue(descriptions.containsAll(listOf("Продукты", "Кофе")))
 
         scenario.recreate()
@@ -213,6 +215,14 @@ class NotesFlowInstrumentedTest {
     }
 
     private fun notesPreferences() = context.getSharedPreferences("notes_storage", Context.MODE_PRIVATE)
+
+    private fun savedNotes() = NotesDatabaseHelper(context).run {
+        try { readNotes() } finally { close() }
+    }
+
+    private fun savedExpenses() = NotesDatabaseHelper(context).run {
+        try { readExpenses() } finally { close() }
+    }
 
     private fun launchApp() {
         scenario = ActivityScenario.launch(MainActivity::class.java)

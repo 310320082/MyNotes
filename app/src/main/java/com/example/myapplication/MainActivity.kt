@@ -18,8 +18,6 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import org.json.JSONArray
-import org.json.JSONObject
 import java.math.BigDecimal
 import java.math.RoundingMode
 import java.text.DateFormat
@@ -37,6 +35,7 @@ class MainActivity : AppCompatActivity() {
     private val notes = mutableListOf<Note>()
     private val expenses = mutableListOf<Expense>()
     private val preferences by lazy { getSharedPreferences("notes_storage", MODE_PRIVATE) }
+    private lateinit var notesDatabase: NotesDatabaseHelper
     private lateinit var homePage: View
     private lateinit var categoryPage: View
     private lateinit var notesContainer: LinearLayout
@@ -53,6 +52,8 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        notesDatabase = NotesDatabaseHelper(applicationContext)
+        notesDatabase.migrateLegacyPreferences(preferences)
         homePage = findViewById(R.id.homePage)
         categoryPage = findViewById(R.id.categoryPage)
         notesContainer = findViewById(R.id.notesContainer)
@@ -98,6 +99,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showHome() { categoryPage.visibility = View.GONE; homePage.visibility = View.VISIBLE }
+
+    override fun onDestroy() {
+        if (::notesDatabase.isInitialized) notesDatabase.close()
+        super.onDestroy()
+    }
 
     @Deprecated("Deprecated in Android API")
     override fun onBackPressed() {
@@ -341,39 +347,29 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun loadNotes() {
-        val saved = preferences.getString("notes", null) ?: return
-        try {
-            val array = JSONArray(saved)
-            for (index in 0 until array.length()) {
-                val item = array.getJSONObject(index)
-                val savedCategory = item.optString("category", ordinaryCategory)
-                val category = if (savedCategory == "Временные") ordinaryCategory else savedCategory
-                notes.add(Note(item.optString("text"), category, item.optLong("reminderAt").takeIf { item.has("reminderAt") && !item.isNull("reminderAt") }, item.optInt("id", index + 1), item.optBoolean("dateOnly", category == shoppingCategory)))
-            }
-        } catch (_: Exception) { notes.clear() }
+        notes.clear()
+        notesDatabase.readNotes().forEach { saved ->
+            notes.add(Note(saved.text, saved.category, saved.reminderAt, saved.id, saved.dateOnly))
+        }
     }
 
     private fun loadExpenses() {
-        val saved = preferences.getString("expenses", null) ?: return
-        try {
-            val array = JSONArray(saved)
-            for (index in 0 until array.length()) {
-                val item = array.getJSONObject(index)
-                expenses.add(Expense(item.getLong("date"), item.getLong("amountKopecks"), item.optString("description", "Без описания").ifBlank { "Без описания" }))
-            }
-        } catch (_: Exception) { expenses.clear() }
+        expenses.clear()
+        notesDatabase.readExpenses().forEach { saved ->
+            expenses.add(Expense(saved.date, saved.amountKopecks, saved.description))
+        }
     }
 
     private fun saveNotes() {
-        val array = JSONArray()
-        notes.forEach { note -> array.put(JSONObject().put("text", note.text).put("category", note.category).put("id", note.id).put("dateOnly", note.dateOnly).apply { note.reminderAt?.let { put("reminderAt", it) } ?: put("reminderAt", JSONObject.NULL) }) }
-        preferences.edit().putString("notes", array.toString()).apply()
+        notesDatabase.replaceNotes(notes.map { note ->
+            NoteRecord(note.id, note.text, note.category, note.reminderAt, note.dateOnly)
+        })
     }
 
     private fun saveExpenses() {
-        val array = JSONArray()
-        expenses.forEach { expense -> array.put(JSONObject().put("date", expense.date).put("amountKopecks", expense.amountKopecks).put("description", expense.description)) }
-        preferences.edit().putString("expenses", array.toString()).apply()
+        notesDatabase.replaceExpenses(expenses.map { expense ->
+            ExpenseRecord(expense.date, expense.amountKopecks, expense.description)
+        })
     }
 
     private data class Note(val text: String, val category: String, val reminderAt: Long? = null, val id: Int = (System.currentTimeMillis() % Int.MAX_VALUE).toInt(), val dateOnly: Boolean = false)
